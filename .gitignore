@@ -1,0 +1,14 @@
+*.py[cod]
+*.so
+*.swp
+*.swo
+
+__pycache__/
+bin/
+build/
+dist/
+eggs/
+sdist/
+*.egg-info/
+.installed.cfg
+*.egg

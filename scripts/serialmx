@@ -1,0 +1,92 @@
+#!/usr/bin/python3
+
+# serial @ 115200 baud
+# NOTE: CDC in Windows is only automatically detected in 10;
+#    8.1 requires an inf file:
+#        linux/Documentation/usb/linux-cdc-acm.inf
+
+from tools import Gadget
+import subprocess
+import logging
+
+class SGadget(Gadget):
+
+    def __enter__(self):
+        print('Configuring gadget')
+        g = self.gadget
+        g.bcdUSB = '0x0200' # usb 2.0
+        g.bcdDevice = '0x0100' # 1.00
+        g.bDeviceClass = '0xef'
+        g.bDeviceSubClass = '0x02'
+        g.bDeviceProtocol = '0x01'
+        #g.bMaxPacketSize0 = 8
+        g.idVendor = '0x1d6b' # Linux Foundation
+        g.idProduct = '0x0104' # Composite Gadget
+
+
+        g.strings['0x409'].serialnumber = '3' # self.serialnumber
+        g.strings['0x409'].manufacturer = '1' # self.manufacturer
+        g.strings['0x409'].product = 'AsoPi Serial'
+
+
+        g.os_desc.use = '1'
+        g.os_desc.b_vendor_code = '0xcd'
+        g.os_desc.qw_sign = 'MSFT100'
+
+        self.fn_name, self.inst_name = 'acm', 'asopis'
+        self.add_function('%s.%s' % (self.fn_name, self.inst_name), 'c.1')
+
+        cmd = 'systemctl enable getty@ttyGS0.service'
+        subprocess.call(cmd.split())
+
+        return self
+
+
+    def __exit__(self, t, value, traceback):
+        print('Tearing down gadget')
+        g = self.gadget
+        g.UDC = ''
+
+        cmd = 'systemctl disable getty@ttyGS0.service'
+        subprocess.call(cmd.split())
+
+        # cleanup any functions created above
+        finns = '%s.%s' % (self.fn_name, self.inst_name)
+        self.remove_function(finns, 'c.1')
+
+        # clean up directories
+        del g.configs['c.1'].strings['0x409']
+        del g.configs['c.1']
+        del g.functions[finns]
+        del g.strings['0x409']
+
+        self.remove_gadget()
+
+def main():
+    import time
+    import argparse
+    parser = argparse.ArgumentParser(description='Serial Daemon')
+    parser.add_argument('--log-level', type=str, help='CRITICAL, ERROR, WARNING, INFO, DEBUG', default='WARN')
+    parser.add_argument('--udc', type=str, help='UDC device. (dummy_udc.0)', default='20980000.usb')
+
+
+    args = parser.parse_args()
+
+    numeric_level = getattr(logging, args.log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.log_level)
+    logging.basicConfig(level=numeric_level)
+
+    with SGadget('asopis') as g:
+        g.bind(args.udc)
+        try:
+            time.sleep(60)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            print("Shutting down")
+
+
+if __name__ == '__main__':
+    main()
+

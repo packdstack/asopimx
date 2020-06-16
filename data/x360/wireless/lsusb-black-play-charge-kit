@@ -1,0 +1,41 @@
+
+Bus 001 Device 008: ID 045e:028f Microsoft Corp. Xbox360 Wireless Controller
+Device Descriptor:
+  bLength                18
+  bDescriptorType         1
+  bcdUSB               2.00
+  bDeviceClass          255 Vendor Specific Class
+  bDeviceSubClass       255 Vendor Specific Subclass
+  bDeviceProtocol       255 Vendor Specific Protocol
+  bMaxPacketSize0         8
+  idVendor           0x045e Microsoft Corp.
+  idProduct          0x028f Xbox360 Wireless Controller
+  bcdDevice            2.04
+  iManufacturer           0 
+  iProduct                0 
+  iSerial                 0 
+  bNumConfigurations      1
+  Configuration Descriptor:
+    bLength                 9
+    bDescriptorType         2
+    wTotalLength           18
+    bNumInterfaces          1
+    bConfigurationValue     1
+    iConfiguration          0 
+    bmAttributes         0xa0
+      (Bus Powered)
+      Remote Wakeup
+    MaxPower              100mA
+    Interface Descriptor:
+      bLength                 9
+      bDescriptorType         4
+      bInterfaceNumber        0
+      bAlternateSetting       0
+      bNumEndpoints           0
+      bInterfaceClass       255 Vendor Specific Class
+      bInterfaceSubClass     93 
+      bInterfaceProtocol    255 
+      iInterface              0 
+Device Status:     0x0002
+  (Bus Powered)
+  Remote Wakeup Enabled
