@@ -4,6 +4,7 @@ from traceback import format_exc
 from struct import *
 from collections import namedtuple
 import base64
+import time
 import logging
 
 from asopimx.profiles import Profile
@@ -135,6 +136,7 @@ class PS3():
 
     def __init__(self):
         self.State = namedtuple('State', 'u1 u2 bset1 bset2 u3 u4 x y z r u5 hu hr hd hl u6 u7 u8 u9 u10 u11')
+        self.format = Struct('B' * 12) # TODO
         self.lstate = self.State(
             1, 0,
             0, 0,
@@ -173,7 +175,6 @@ class PS3():
         '''
         package = base64.b16decode('01 00'.replace(' ', ''))
         package += struct.pack('H', self.lstate.bset1)
-        print(self.lstate.x)
         # 16-buttons (binary)
         package += base64.b16decode('00 00'.replace(' ', ''))
         # l&r sticks (0-255)
@@ -198,45 +199,75 @@ class PS3():
         # (byte before each of them are acceleration? detection of motion? orientation?)
         # (juding by hid report data, motion detection seems most likely)
         package += base64.b16decode('00 02 05 03 EF 01 93 04'.replace(' ', ''))
-        print(len(package))
         return package
 
     def update_axis(self, id, value):
         aid = self.saxi.get(id, None)
         amap = {0:'x', 1:'y', 2:'z', 3:'r', 4:'hu', 5:'hr', 6:'hd', 7:'hl'}
         if aid is None or id not in amap:
-            print('not mapped')
+            _logger.warning('not mapped')
             return
 
-        print(value)
         avalue = int((value / 32767.0) * 128) + 128
-        print(avalue)
         if avalue > 255:
             avalue = 255
-        print(amap[id])
         self.lstate.__dict__[amap[id]] = avalue
         self.lstate = self.lstate._replace(**{amap[id]: avalue})
-        print(self.lstate)
 
     def update_button(self, id, value):
         bid = self.sbuttons.get(id, None)
         if bid is None:
-            print('not mapped')
+            _logger.warning('not mapped')
             return
         # TODO: pick button block depending on bid
         bstates = self.lstate.bset1
         bbstates = self.decode_bools(bstates, 16)
         bbstates[bid] = True if value else False
-        print(bbstates)
         self.lstate = self.lstate._replace(bset1=self.encode_bools(bbstates))
-        print(self.lstate.bset1)
         return
 
 class PS3Profile(PS3,Profile):
     pass
 
-class PS3Pad(PS3,Gamepad):
-    pass
+class PS3Pad(PS3,Gamepad): # TODO
+    def __init__(self, device=None):
+        super(PS3Pad, self).__init__()
+        if device:
+            self.assign_device(device)
+    def assign_device(self, device):
+        self.dev = device # new-style device
+        self.device = device.dev # phys device
+    def assign_profile(self, profile):
+        ''' assign a profile to push/pull states to/from '''
+        self.profile = profile
+    def listen(self):
+        while True:
+            # TODO: handle timeouts
+            data = bytes(self.device.read(64))
+            self.read(data)
+            time.sleep(.1) # let the system breath
+    def read(self, data):
+        ''' "Read" data from phys device (recorded data can be passed in for testing)'''
+        if not data:
+            return
+        self.state = self.unpack(data)
+        self.send_profile()
+    def unpack(self, data):
+        ''' get data message, translate it to capability class state '''
+        try:
+            s = self.format.unpack(data)
+        except Exception as e:
+            _logger.warn(e)
+            return self.state
+        return self.State(*s)
+        # TODO: translate state tp capability class state
+    def send_profile(self):
+        ''' send current state to profile
+        TODO: (in inherited device's state format (ie. Gamepad)
+        '''
+        # TODO: support raw send if device and profile match (no translation wanted/needed)
+        self.cstate = self.transform_cc(self.state)
+        self.profile.recv_dev(self.cstate)
 
 
 if __name__ == '__main__':
@@ -245,7 +276,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clean', default=False, action='store_true')
     args = parser.parse_args()
-    dev = PS3()
+    dev = PS3Profile()
     if args.clean:
         dev.clean()
         sys.exit()

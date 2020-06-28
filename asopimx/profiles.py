@@ -54,6 +54,7 @@ class Profile:
         else: # we're already registered?
             # TODO: check to see if this path is legit
             self.path = path
+        self.warned = 0
 
     def clean(self):
         # TODO: make this more pythonic
@@ -117,14 +118,18 @@ class Profile:
     def send_event(self):
         ''' repack state and send to host '''
         s = self.repack()
-        #print(repr(s))
         #with open(self.path, 'wb') as f:
         #    f.write(s)
         if self.fd is None:
             # wait until device's created
             # (won't work if we create the file ourselves)
             if not path.exists(self.path):
-                _logger.warn('%s not ready; discarding event', self.path)
+                return # this was slowing things down?
+                if self.warned % 10000 == 0:
+                    _logger.warning('%s not ready; discarding event', self.path)
+                    if self.warned == 100000:
+                        self.warned = 0
+                self.warned += 1
                 return
             else:
                 self.fd = open(self.path, 'wb')
@@ -147,4 +152,4 @@ if __name__ == '__main__':
     try:
         dev.register()
     except:
-        _logger.warn(format_exc())
+        _logger.warning(format_exc())

@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # Released by rdb under the Unlicense (unlicense.org)
 # Based on information from:
 # https://www.kernel.org/doc/Documentation/input/joystick-api.txt
@@ -98,7 +100,7 @@ jsdev = open(fn, 'rb')
 
 # Get the device name.
 #buf = bytearray(63)
-buf = array.array('c', ['\0'] * 64)
+buf = array.array('B', [ord('\0')] * 64)
 ioctl(jsdev, 0x80006a13 + (0x10000 * len(buf)), buf) # JSIOCGNAME(len)
 js_name = buf.tostring()
 print('Device name: %s' % js_name)
@@ -134,7 +136,9 @@ print('%d axes found: %s' % (num_axes, ', '.join(axis_map)))
 print('%d buttons found: %s' % (num_buttons, ', '.join(button_map)))
 
 # Main event loop
+from time import sleep
 while True:
+    sleep(.1) # let the system breath
     evbuf = jsdev.read(8)
     if evbuf:
         time, value, type, number = struct.unpack('IhBB', evbuf)

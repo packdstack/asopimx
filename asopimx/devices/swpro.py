@@ -8,6 +8,7 @@ from struct import *
 from collections import namedtuple
 import base64
 import struct
+import time
 import logging
 
 from asopimx.profiles import Profile
@@ -21,7 +22,7 @@ _logger.setLevel(logging.INFO) # logging.getLevelName('INFO')
 
 class SWPRO():
     # TODO: work out state management
-    
+
     name = 'Switch Pro'
     code = 'swpro'
     products = {
@@ -45,7 +46,7 @@ class SWPRO():
     serial = '0' # iSerial
     configuration = 'Human Interface Device' # TODO: find out if there's anything relevant to put here
     max_power = '500' # 500mA # MaxPower
-    
+
     # hid data
     protocol = '0' # bInterfaceProtocol
     subclass = '0' # bInterfaceSubClass
@@ -229,7 +230,7 @@ class SWPRO():
         hvals.reverse()
         hv = encode_bools(hvals)
         h = self.hmap.get(hv, 8)
- 
+
         self.state = self.State(
             self.state.u1,
             bset1, cstate.bset2,
@@ -249,31 +250,25 @@ class SWPRO():
         aid = self.saxi.get(id, None)
         amap = {0:'x', 1:'y', 2:'z', 3:'r'}
         if aid is None or id not in amap:
-            print('not mapped')
+            _logger.warn('not mapped')
             return
 
-        print(value)
         avalue = int((value / 32767.0) * 128) + 128
-        print(avalue)
         if avalue > 255:
             avalue = 255
-        print(amap[id])
         self.state.__dict__[amap[id]] = avalue
         self.state = self.state._replace(**{amap[id]: avalue})
-        print(self.state)
 
     def update_button(self, id, value):
         bid = self.sbuttons.get(id, None)
         if bid is None:
-            print('not mapped')
+            _logger.warn('not mapped')
             return
         # TODO: pick button block depending on bid
         bstates = self.state.bset1
         bbstates = self.decode_bools(bstates, 16)
         bbstates[bid] = True if value else False
-        print(bbstates)
         self.state = self.state._replace(bset1=self.encode_bools(bbstates))
-        print(self.state.bset1)
         return
 
 
@@ -306,6 +301,7 @@ class SWPROPC(SWPRO,Gamepad):
         if not data:
             return
         self.state = self.unpack(data)
+        #print('\rState: %s' % str(self.state), end='')
         self.send_profile()
     def send_profile(self):
         ''' send current state to profile
@@ -319,11 +315,13 @@ class SWPROPC(SWPRO,Gamepad):
             # TODO: handle timeouts
             data = bytes(self.device.read(64))
             self.read(data)
+            time.sleep(.001) # let the system breath
+
 
 if __name__ == '__main__':
     import argparse
     import sys
-    from tools import phexlify
+    from asopimx.tools import phexlify
     parser = argparse.ArgumentParser(description='if no arguments specified, registers profile')
     parser.add_argument('-c', '--clean', default=False, action='store_true')
     parser.add_argument('-t', '--test', default=False, action='store_true')

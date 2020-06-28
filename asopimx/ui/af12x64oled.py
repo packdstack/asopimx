@@ -13,7 +13,7 @@ import sys
 import traceback
 import logging
 
-import Adafruit_GPIO.SPI as SPI
+from busio import SPI
 import Adafruit_SSD1306
 
 from PIL import Image, ImageDraw, ImageFont

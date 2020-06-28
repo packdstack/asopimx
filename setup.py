@@ -6,7 +6,7 @@
 #from distutils.core import setup
 from setuptools import setup, find_packages
 
-with open('README.rst') as f:
+with open('README.md') as f:
     long_desc = f.read()
 
 setup(
@@ -20,7 +20,12 @@ setup(
     #packages=['asopimx', 'asopimx.ui', 'asopimx.tools', 'asopimx.devices'],
     packages=find_packages(),
     # TODO: fill out requirements
-    install_requires=['hidapi'],
+    install_requires=[
+        'hidapi', 'numpy', 'path', 'rpi.gpio',
+        'adafruit-blinka','adafruit-SSD1306', # hw ui
+        'bluew>0.4.6', # if this DNE, pull git master: https://github.com/nullp0tr/bluew.git
+        'lxml',
+    ],
     scripts=['scripts/asopimx'],
     classifiers=[
         'Development Status :: 3 - Alpha',

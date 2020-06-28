@@ -12,6 +12,7 @@ class Device(Namespace):
         pass
 
 class Gamepad:
+    # TODO: add some commonly shared functions (to ease implementation of cross-device feature)
     # supports the traditional PC-style (X360) controller layout
     # (may be extended in the future to support additional capabilities)
     # digital ABXY,RB,LB,RS,LS,Select,Start,Home

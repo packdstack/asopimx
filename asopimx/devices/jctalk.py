@@ -89,13 +89,13 @@ class JCDP(JCD):
         super(JCDP, self).__init__()
 
     def init(self):
-        print('enable vibration')
+        _logger.info('enabling vibration')
         self.vibrate(True)
         #print('enable IMU data (6-axis sensor)')
         #self.imu(True)
-        print("disable IMU data (6-axis sensor; we're not using it)")
+        _logger.info("disabling IMU data (6-axis sensor; we're not using it)")
         self.imu(False)
-        print('switching to full reports')
+        _logger.info('switching to full reports')
         self.send(0x1, 0x3, [0x30])
         #print('read device s/n (not necessary)')
         #self.read_spi(0x6002, 0xE)
@@ -113,7 +113,6 @@ class JCDP(JCD):
     def read_spi(self, offset, size):
         high, low = divmod(offset, 0x100)
         subargs = [low, high, size]
-        print(subargs)
         return self.send(0x1, 0x10, subargs)
 
 
@@ -149,7 +148,7 @@ class JCDP(JCD):
             '19 01 03 08 00 92 00 01 00 00 69 2D 1F',
         ]
         for cmd in cmds:
-            print('send %s' % cmd)
+            _logger.debug('send %s' % cmd)
             c = base64.b16decode(cmd.replace(' ', ''))
             self.dev.write(c)
             res = False
@@ -160,7 +159,7 @@ class JCDP(JCD):
                     res = self.dev.read(64, 15)
                 except IOError:
                     pass
-            print('recv %s' % res)
+            _logger.debug('recv %s' % res)
 
     def poll(self):
         ''' serial poll (?) '''
@@ -209,15 +208,16 @@ class JCDP(JCD):
                     # MSB == 1; ack, MSB == nack
                     ack = report.ack >> 7
                     if not ack:
-                        print("plights %s'd" % 'ack' if ack else 'nack')
+                        _logger.debug("plights %s'd" % 'ack' if ack else 'nack')
                 else:
-                    print(
+                    _logger.warning(
                         'unsupported scmd report: %s (%s)' % (
                             phexlify(bytes([report.scrid])), report.scrid
                     ))
             else:
-                print('unsupported: %s' % rtype)
-                print(phexlify(bytes(r)))
+                _logger.warning('unsupported: %s' % rtype)
+                _logger.warning(phexlify(bytes(r)))
+            time.sleep(.01) # let the system breath
         
 
     def update_state(self, report):
@@ -310,7 +310,6 @@ class JCDP(JCD):
         r = [timing, b0, b1, b2, b3] # one cont
         rumble = r + r
 
-        #print(rumble)
         self.send(0x10, rumble=rumble)
         return []
 
@@ -324,12 +323,10 @@ class JCDP(JCD):
 
     def show_battery(self):
         bl = self.lstate.bl
-        print(bl)
         btmap = {8:9,6:5,4:3,2:1}
         charging = bl & 1
         pl = (btmap.get(bl, bl) - charging) << 4
         pl = pl + charging
-        #print(pl)
         self.plights(pl)
 
 class JCL(JCDP):
@@ -477,18 +474,15 @@ class Main:
                         break # already found
                 if claimed:
                     continue
-                print('%s Found! (%s / %s)' % (d.product_string, d.serial_number, d.path))
+                _logger.info('%s Found! (%s / %s)' % (d.product_string, d.serial_number, d.path))
                 dev = hid.device()
                 dev.open_path(d.path)
                 d.dev = dev
         
                 jcd = self.pmap[key](d) # , self.loop)
-                print('info')
                 #jcd.print(jcd.info())
-                print('lights')
                 jcd.plights(0x80 | 0x40, 0x2 | 0x1)
                 #jcd.plights()
-                print('rumble')
                 jcd.rumble()
                 new.append(jcd)
         self.found.extend(new)
@@ -498,7 +492,7 @@ class Main:
                 jcrs = filter(lambda x: isinstance(x, JCR), self.found)
                 jcls = filter(lambda x: isinstance(x, JCL), self.found)
                 if jcrs and jcls:
-                    print('pairing jcds!')
+                    _logger.info('pairing jcds')
                     jcp = JCP(next(jcrs), next(jcls))
                     # TODO: remove the ones we just mapped
                     self.found = [jcp]

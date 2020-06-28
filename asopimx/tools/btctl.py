@@ -17,6 +17,7 @@ import logging
 #import threading
 import time
 from typing import List, Optional, Callable  # pylint: disable=W0611
+from argparse import Namespace
 import dbus
 
 _logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ from bluew.dbusted.decorators import (
 
 class BIO(BluezObjectInterface):
     pass
-        
+
 
 class Btctl:
     def __init__(self):
@@ -83,10 +84,12 @@ class Btctl:
             # else: we're good
 
     def start_scan(self) -> None:
+        _logger.warning('starting scan')
         bia = BluezAdapterInterface(self._bus, self.cntl)
         bia.start_discovery()
 
     def stop_scan(self) -> None:
+        _logger.warning('stopping scan')
         bia = BluezAdapterInterface(self._bus, self.cntl)
         bia.stop_discovery()
 
@@ -99,7 +102,21 @@ class Btctl:
         self.stop_scan()
 
     @property
-    def devices(self):
+    def devices(self): # this gets slow when iterated over
+        return self.get_devices()
+
+    def get_devices(self): # NOTE: this isn't any faster
+        from sh import bluetoothctl as blc
+        devices = [d.split(' ', 2) for d in blc('devices').split('\n')]
+        print(devices)
+        if devices:
+            devices = [Namespace(**{
+                'address': d[1],
+                'name': d[2],
+            }) for d in devices if d and len(d) > 2]
+        return devices or []
+        # these turn discovery on and off; weird
+        return bluew.devices()
         bio = BIO(self._bus)
         return bio.get_devices()
 
@@ -124,8 +141,10 @@ class Btctl:
     def dev_to_path(self, dev):
         if isinstance(dev, bluew.device.Device):
             if dev.paired:
-                print('altready paired...')
+                _logger.info('altready paired...')
             #    self.remove(dev)
+            mac = ('/dev:%s' % dev.address).replace(':', '_')
+        elif isinstance(dev, Namespace):
             mac = ('/dev:%s' % dev.address).replace(':', '_')
         else:
             mac = dev
@@ -135,17 +154,17 @@ class Btctl:
         mac = self.dev_to_path(dev)
         bid = BluezDeviceInterface(self._bus, mac, self.cntl)
         did = '/org/bluez/' + self.cntl + mac
-        print(did)
+        _logger.debug(did)
         bo = self._bus.get_object('org.bluez', did)
-        print(bo)
+        _logger.debug(bo)
         dif = dbus.Interface(bo, 'org.bluez.Device1')
         prop = dbus.Interface(bo, 'org.freedesktop.DBus.Properties')
-        print(dif)
+        _logger.debug(dif)
         dif.Pair() # pair
         dif.Connect() # connect
         prop.Set('org.bluez.Device1', 'Trusted', True) # trust
-        print(bid.dev)
-        print('pairing')
+        _logger.debug(bid.dev)
+        _logger.info('pairing')
         #bid.pair_device()
         #paired = self.is_device_paired(dev.path)
         #if not paired:
@@ -170,21 +189,33 @@ class Btctl:
         mac = self.dev_to_path(dev)
         bid = BluezDeviceInterface(self._bus, mac, self.cntl)
         did = '/org/bluez/' + self.cntl + mac
-        print(did)
+        _logger.debug(did)
         bo = self._bus.get_object('org.bluez', did)
-        print(bo)
+        _logger.debug(bo)
         dif = dbus.Interface(bo, 'org.bluez.Device1')
-        print(dif)
+        _logger.debug(dif)
         # connect
         dif.Connect()
+
+    def disconnect(self, dev) -> None:
+        mac = self.dev_to_path(dev)
+        bid = BluezDeviceInterface(self._bus, mac, self.cntl)
+        did = '/org/bluez/' + self.cntl + mac
+        _logger.debug(did)
+        bo = self._bus.get_object('org.bluez', did)
+        _logger.debug(bo)
+        dif = dbus.Interface(bo, 'org.bluez.Device1')
+        _logger.debug(dif)
+        # connect
+        dif.Disconnect()
 
     def remove(self, dev) -> None:
         # TODO: device ops want dev.path, not (strictly) mac
         # (BLuezAdapterInterface tries too hard)
         # example: /org/bluez/hci0/dev_00_00_00_00_00_00 
         mac = self.dev_to_path(dev)
-        print('removing %s' % mac)
-        print(self.cntl)
+        _logger.info('removing %s' % mac)
+        _logger.debug(self.cntl)
         bia = BluezAdapterInterface(self._bus, self.cntl)
         bia.remove_device(mac)
 
